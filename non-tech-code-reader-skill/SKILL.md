@@ -134,16 +134,18 @@ Always lead with business meaning — never with technical mechanism.
 [Hidden assumptions, product constraints, or technical debt that could affect decisions]
 ```
 
-**Diagram — flowchart of the happy path + error branches**:
-Generate a Mermaid flowchart showing:
+---
 
-- The trigger event as the start node
-- The happy path as the main vertical flow
-- Each if/else branch as a decision diamond
-- Error outcomes as terminal nodes in a different style
-- Hardcoded business rules annotated on the relevant step
+**Diagrams — Multi-Perspective Flow Suite**
 
-Example structure:
+Mode A always outputs the following diagrams in sequence. Each diagram must be preceded by a one-line label stating its perspective and what it reveals that the others do not.
+
+---
+
+**Diagram 1 — Happy Path + Branch Flowchart (主流程图)**
+
+The primary flow diagram. Shows trigger → happy path → branches → error outcomes.
+Always generated first. This is the anchor that the other diagrams reference.
 
 ```mermaid
 flowchart TD
@@ -160,6 +162,118 @@ flowchart TD
     F -- No --> E4([Show: wrong password])
     OK([Issue 7-day token ✓])
 ```
+
+---
+
+**Diagram 2 — System Swimlane (系统维度泳道图)**
+
+Shows which system owns each step. Reveals system boundaries, handoff points, and where cross-system dependencies exist.
+
+Generate only if the code involves 2+ distinct systems, services, or modules. If not applicable, write: `> ℹ️ System swimlane not applicable — this code runs within a single system.`
+
+Each swimlane = one system or service. Handoffs between swimlanes = integration points.
+
+```mermaid
+flowchart LR
+    subgraph 采购系统
+        A1[建立采购订单] --> A2[审核通过] --> A3[接收付款结果] --> A4[接收收货结果]
+    end
+    subgraph 财务系统
+        B1[生成付款单据] --> B2[财务付款]
+    end
+    subgraph WMS系统
+        C1[仓库接收采购单] --> C2[收货入库]
+    end
+    subgraph 库存系统
+        D1[库存增加]
+    end
+    A2 --> B1
+    B2 --> A3
+    A3 --> C1
+    C2 --> D1
+    D1 --> A4
+```
+
+---
+
+**Diagram 3 — Role Swimlane (角色维度泳道图)**
+
+Shows who does what. Reveals accountability, handoffs between people, and steps that require cross-role coordination.
+
+Generate only if the code involves actions by 2+ distinct roles or user types. If not applicable, write: `> ℹ️ Role swimlane not applicable — this code involves a single actor.`
+
+Each swimlane = one role. Steps inside = that role's responsibility. Arrows crossing swimlanes = handoffs.
+
+```mermaid
+flowchart LR
+    subgraph 采购专员
+        R1[建立采购单据] --> R5[通知供应商发货]
+    end
+    subgraph 采购经理
+        R2[审核采购单]
+    end
+    subgraph 财务人员
+        R3[对供应商付款]
+    end
+    subgraph 仓库人员
+        R4[收货并质检]
+    end
+    subgraph 供应商
+        R6[发货]
+    end
+    R1 --> R2
+    R2 -- 审核通过 --> R3
+    R3 --> R5
+    R5 --> R6
+    R6 --> R4
+```
+
+---
+
+**Diagram 4 — Timeline / Phase View (时间线阶段图)**
+
+Shows the flow as ordered phases or stages. Reveals how long the process takes conceptually, where waiting/blocking happens, and what must complete before the next phase starts.
+
+Generate only if the flow has meaningful sequential phases (e.g., approval → payment → fulfillment). If the code is a single atomic operation, write: `> ℹ️ Timeline view not applicable — this is a single-phase operation.`
+
+```mermaid
+flowchart LR
+    PH1["📋 Phase 1\n订单创建\n采购专员建单\n经理审核"] --> PH2["💳 Phase 2\n财务付款\n生成付款单\n财务执行付款"]
+    PH2 --> PH3["📦 Phase 3\n收货入库\n供应商发货\n仓库质检入库"]
+    PH3 --> PH4["✅ Phase 4\n结果同步\n库存更新\n采购单关闭"]
+    style PH1 fill:#dbeafe,stroke:#3b82f6
+    style PH2 fill:#fef3c7,stroke:#d97706
+    style PH3 fill:#d1fae5,stroke:#059669
+    style PH4 fill:#ede9fe,stroke:#7c3aed
+```
+
+---
+
+**Diagram 5 — AI-Identified Perspective (AI 自选补充视角)**
+
+After generating Diagrams 1–4, assess whether there is an additional structural insight that none of the above diagrams captured. Generate this diagram only if a genuinely different perspective exists.
+
+Candidates (pick the one most revealing for this specific code):
+- **Data flow view**: what data objects are created, read, or modified at each step
+- **Exception / error path map**: all error branches and fallback behaviors in one view
+- **State machine**: how the core entity (order, user, ticket) transitions between states
+- **Dependency map**: what this code depends on, and what depends on it
+
+If no additional perspective adds meaningful insight beyond what Diagrams 1–4 already show, write:
+`> ℹ️ No additional perspective needed — the four diagrams above cover the key structural views of this flow.`
+
+Label the chosen perspective explicitly, e.g.:
+`> 📊 Diagram 5 — State Machine View: shows how the purchase order status transitions throughout the process`
+
+---
+
+**Diagram generation rules for Mode A**:
+- Always generate Diagram 1 (main flow). Never skip it.
+- Generate Diagrams 2, 3, 4 unless explicitly inapplicable (use the ℹ️ note when skipping).
+- Generate Diagram 5 only when it adds something the other four do not.
+- Each diagram must be preceded by a one-line label: what perspective it represents and what unique insight it provides.
+- Max 10 nodes per diagram. If the flow is more complex, show the critical path and note simplification.
+- Never generate a diagram that merely repeats another diagram's content in a different layout.
 
 ---
 
@@ -266,10 +380,11 @@ Trigger signals: "generate a doc", "write a summary", "share with the team", "se
 - Key assumptions and constraints
 - Open questions — things the PM should confirm with the developer before treating this as final
 
-**Diagram — embed the Mode A flowchart inside the doc**:
-Include the happy path + branch flowchart (same as Mode A diagram) directly in the Markdown doc
-so recipients who receive the document also get the visual. Place it after the normal flow section.
-Label it clearly: `> 📊 Flow diagram (AI-generated, verify with engineering)`
+**Diagram — embed the full Mode A Multi-Perspective Flow Suite inside the doc**:
+Include all applicable diagrams from Mode A (Diagrams 1–5) directly in the Markdown doc.
+Place them after the normal flow section, grouped under a heading:
+`## 📊 Flow Diagrams (AI-generated — verify with engineering)`
+Label each sub-diagram clearly so recipients who receive the document understand which perspective each diagram represents.
 
 ---
 
@@ -494,11 +609,12 @@ flowchart TD
 ## Best Practices
 
 1. **Business meaning first** — always explain what the code means for the product before explaining how it works technically
-2. **Diagrams complement, not repeat** — the diagram should show something the text cannot: flow, proportion, sequence, or spatial relationship. Never generate a diagram that just lists the same bullet points in a box
-3. **Surface hidden constraints proactively** — hardcoded business rules, fixed enums, configs without rollback: these are the highest-value insights for PMs and ops; do not wait to be asked
-4. **Flag uncertainty explicitly** — when code is ambiguous or incomplete, say "My interpretation is X — recommend confirming with engineering" rather than stating it as fact
-5. **Mode F requires both inputs** — never attempt a gap analysis without the PRD; inferring product intent from code alone produces unreliable results
-6. **Keep diagrams simple** — max 8-10 nodes per diagram; if the code is more complex, show the most important path and note that detail was simplified
+2. **Multi-perspective diagrams in Mode A** — always generate the full diagram suite (Diagrams 1–4 by default, Diagram 5 when it adds genuine insight); never produce only one diagram when multiple perspectives exist
+3. **Diagrams complement, not repeat** — each diagram must show something the others cannot: flow, system boundary, role accountability, time sequence, or state. Never generate two diagrams that convey the same structural insight
+4. **Surface hidden constraints proactively** — hardcoded business rules, fixed enums, configs without rollback: these are the highest-value insights for PMs and ops; do not wait to be asked
+5. **Flag uncertainty explicitly** — when code is ambiguous or incomplete, say "My interpretation is X — recommend confirming with engineering" rather than stating it as fact
+6. **Mode F requires both inputs** — never attempt a gap analysis without the PRD; inferring product intent from code alone produces unreliable results
+7. **Keep diagrams simple** — max 10 nodes per diagram; if the code is more complex, show the most important path and note that detail was simplified
 
 ---
 
@@ -509,7 +625,9 @@ flowchart TD
 - Running Mode F without a PRD and guessing the intended behavior instead
 - Returning a large code block as the primary answer
 - Expressing higher confidence than the code actually supports ("this definitely does X")
+- **Generating only one diagram in Mode A** — a single main flow diagram is insufficient; always produce the full multi-perspective suite
 - Generating a diagram that just mirrors the text as boxes — diagrams must add visual insight not present in the text
+- Skipping the system or role swimlane without an explicit ℹ️ note explaining why it is not applicable
 
 ---
 
@@ -518,8 +636,8 @@ flowchart TD
 ### Example 1: PM wants to understand a feature
 
 **User**: "Here's our checkout flow code — can you tell me what it does?"
-**Action**: Mode A — business logic summary + happy path / branch flowchart
-**Output**: Trigger + normal flow + error table + ⚠️ PM should know + Mermaid flowchart
+**Action**: Mode A — business logic summary + full multi-perspective diagram suite
+**Output**: Trigger + normal flow + error table + ⚠️ PM should know + Diagram 1 (main flow) + Diagram 2 (system swimlane) + Diagram 3 (role swimlane) + Diagram 4 (phase timeline) + Diagram 5 if applicable
 
 ### Example 2: Checking if a requirement is already supported
 
@@ -548,8 +666,8 @@ flowchart TD
 ### Example 6: Generating a team-facing document
 
 **User**: "This is our payment flow code — generate a summary I can send to QA and operations"
-**Action**: Mode D — full Markdown doc with embedded flowchart
-**Output**: Complete shareable doc including the visual flow diagram
+**Action**: Mode D — full Markdown doc with embedded multi-perspective diagram suite
+**Output**: Complete shareable doc including all applicable flow diagrams from the Mode A suite
 
 ### Example 7: Understanding tracking events
 
